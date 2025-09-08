@@ -15,17 +15,28 @@
   <div class="sand"></div>
   <div class="grain"></div>
 
-  <header class="poster">
-    <div class="titleWrap">
-      <h1 class="title">LOVE PLANT</h1>
-      <p class="subtitle">a surreal ritual for two</p>
-    </div>
-    <div class="roomWrap">
-      <label>Room</label>
-      <input id="roomInput" placeholder="enter code" />
-      <button id="roomApply" class="pill">Use</button>
-    </div>
-  </header>
+ <header class="poster">
+  <div class="titleWrap">
+    <h1 class="title">LOVE PLANT</h1>
+    <p class="subtitle">a surreal ritual for two</p>
+  </div>
+  <div class="roomWrap">
+    <label>Room</label>
+    <input id="roomInput" placeholder="enter code" />
+    <button id="roomApply" class="pill">Use</button>
+  </div>
+  <div class="identityWrap" style="display:flex; gap:.75rem; align-items:center; margin-top:.5rem">
+    <span style="font:600 14px/1.2 'Space Grotesk',system-ui">I am</span>
+    <label style="display:flex; gap:.35rem; align-items:center; cursor:pointer">
+      <input type="radio" name="who" value="Me" checked>
+      <span>Me</span>
+    </label>
+    <label style="display:flex; gap:.35rem; align-items:center; cursor:pointer">
+      <input type="radio" name="who" value="Partner">
+      <span>Partner</span>
+    </label>
+  </div>
+</header>
 
   <main class="stage">
     <section class="panel">
