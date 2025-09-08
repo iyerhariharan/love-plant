@@ -1,128 +1,190 @@
-// ---------------- config ----------------
-const WORKER = window.WORKER_BASE; // set in index.html
+// ----- config -------------------------------------------------
+const WORKER = window.WORKER_BASE;               // set in index.html
 const qs = new URLSearchParams(location.search);
-const $ = (sel) => document.querySelector(sel);
+let ROOM = qs.get("room") || "";
 
-const roomInput = $("#roomInput");
-const roomApply = $("#roomApply");
-const whoRadios  = document.querySelectorAll('input[name="who"]');
+// ----- dom ----------------------------------------------------
+const roomInput   = document.getElementById("roomInput");
+const roomApply   = document.getElementById("roomApply");
 
-const meInput       = $("#meInput");
-const partnerInput  = $("#partnerInput");
-const renameBtn     = $("#renameBtn");
-const waterBtn      = $("#waterBtn");
-const fightBtn      = $("#fightBtn");
+const meInput     = document.getElementById("meInput");
+const partnerInput= document.getElementById("partnerInput");
+const renameBtn   = document.getElementById("renameBtn");
 
-const statusBox  = $("#status");
-const statStreak = $("#streakVal");
-const statBest   = $("#bestVal");
-const statPeace  = $("#peaceVal");
-const statFights = $("#fightsCount");
+const waterBtn    = document.getElementById("waterBtn");
+const fightBtn    = document.getElementById("fightBtn");
 
-// state kept in localStorage so the page remembers
-const store = {
-  get room() { return qs.get("room") || localStorage.getItem("room") || ""; },
-  set room(v) { localStorage.setItem("room", v || ""); },
+const statusBox   = document.getElementById("status");
+const statStreak  = document.querySelector('[data-stat="streak"], #streakVal');
+const statBest    = document.querySelector('[data-stat="best"], #bestVal');
+const statPeace   = document.querySelector('[data-stat="peace"], #peaceVal');
+const statFights  = document.querySelector('[data-stat="fights"], #fightsCount');
 
-  get who() { return localStorage.getItem("who") || "Me"; },
-  set who(v) { localStorage.setItem("who", v === "Partner" ? "Partner" : "Me"); },
-};
+const whoTextMe        = document.getElementById("whoTextMe");
+const whoTextPartner   = document.getElementById("whoTextPartner");
+const plantSvg         = document.getElementById("plantSvg");
 
-function setStatus(msg) { statusBox.textContent = msg || ""; }
+// ----- helpers ------------------------------------------------
+function setStatus(msg) {
+  statusBox.textContent = msg || "";
+}
 
-// UTC date string YYYY-MM-DD so both people agree on the day
-function todayUTC() {
+function selectedWho() {
+  const r = document.querySelector('input[name="who"]:checked');
+  return r ? r.value : "Me";
+}
+
+function today() {
   const d = new Date();
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 async function apiGet(room) {
-  const r = await fetch(`${WORKER}/room/${encodeURIComponent(room)}`, {
-    headers: { Accept: "application/json" },
-  });
+  const url = `${WORKER}/room/${encodeURIComponent(room)}`;
+  const r = await fetch(url, { headers: { Accept: "application/json" } });
   if (!r.ok) throw new Error(`GET ${r.status}`);
   return r.json();
 }
 
 async function apiPost(room, body) {
-  const r = await fetch(`${WORKER}/room/${encodeURIComponent(room)}`, {
+  const url = `${WORKER}/room/${encodeURIComponent(room)}`;
+  const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  // 409 = already logged today by this member -> bubble up for friendly message
   if (!r.ok) {
-    // bubble up short server messages if possible
-    let txt = "";
-    try { txt = (await r.json()).error || ""; } catch {}
-    throw new Error(txt || `POST ${r.status}`);
+    const text = await r.text().catch(() => "");
+    const msg = (() => {
+      try { return JSON.parse(text).error; } catch { return text || `POST ${r.status}`; }
+    })();
+    throw new Error(msg || `POST ${r.status}`);
   }
   return r.json();
 }
 
-function paint(state) {
-  statStreak.textContent = state.streak ?? 0;
-  statBest.textContent   = state.bestStreak ?? 0;
-  statPeace.textContent  = state.totalPeaceDays ?? 0;
-  statFights.textContent = state.totalFights ?? 0;
-  if (meInput && partnerInput) {
-    meInput.value = state.me ?? "Me";
-    partnerInput.value = state.partner ?? "Partner";
-  }
+function paintStats(state) {
+  if (statStreak)  statStreak.textContent  = state.streak ?? 0;
+  if (statBest)    statBest.textContent    = state.bestStreak ?? 0;
+  if (statPeace)   statPeace.textContent   = state.totalPeaceDays ?? 0;
+  if (statFights)  statFights.textContent  = state.totalFights ?? 0;
 }
 
-// load room on start
+function paintNames(state) {
+  // inputs
+  if (meInput && meInput.value !== state.me) meInput.value = state.me;
+  if (partnerInput && partnerInput.value !== state.partner) partnerInput.value = state.partner;
+  // radio labels
+  if (whoTextMe) whoTextMe.textContent = state.me || "Me";
+  if (whoTextPartner) whoTextPartner.textContent = state.partner || "Partner";
+}
+
+function drawPlant(state) {
+  if (!plantSvg) return;
+  // simplistic, but pretty: clear + redraw based on growth/health
+  plantSvg.innerHTML = "";
+  const ns = "http://www.w3.org/2000/svg";
+
+  // background pot
+  const pot = document.createElementNS(ns, "ellipse");
+  pot.setAttribute("cx", "260");
+  pot.setAttribute("cy", "440");
+  pot.setAttribute("rx", "110");
+  pot.setAttribute("ry", "28");
+  pot.setAttribute("fill", "#3b2718");
+  plantSvg.appendChild(pot);
+
+  // stem height proportional to growth (0..100 => 120..260)
+  const stemH = 120 + Math.min(100, Math.max(0, state.growth ?? 0)) * 1.4;
+  const stem = document.createElementNS(ns, "path");
+  stem.setAttribute(
+    "d",
+    `M260,420 C260,${420 - stemH * 0.5} 260,${420 - stemH * 0.8} 260,${420 - stemH}`
+  );
+  stem.setAttribute("stroke", "#1fbf7a");
+  stem.setAttribute("stroke-width", "12");
+  stem.setAttribute("fill", "none");
+  stem.setAttribute("stroke-linecap", "round");
+  plantSvg.appendChild(stem);
+
+  // heart helper
+  const heart = (cx, cy, scale, color) => {
+    const p = document.createElementNS(ns, "path");
+    // simple heart path around 0,0; translate+scale
+    p.setAttribute(
+      "d",
+      "M0,-8 C-6,-18 -24,-10 -24,5 C-24,20 -8,28 0,36 C8,28 24,20 24,5 C24,-10 6,-18 0,-8 Z"
+    );
+    p.setAttribute(
+      "transform",
+      `translate(${cx},${cy}) scale(${scale})`
+    );
+    p.setAttribute("fill", color);
+    p.setAttribute("opacity", "0.9");
+    plantSvg.appendChild(p);
+  };
+
+  // colors shift a bit with health
+  const health = Math.min(100, Math.max(0, state.health ?? 80));
+  const good = health >= 60;
+  const c1 = good ? "#24d6a1" : "#9bbf3b";
+  const c2 = good ? "#4d9cff" : "#7aa0d8";
+  const c3 = good ? "#ff7ab6" : "#b46f96";
+  const c4 = good ? "#41d672" : "#b3d641";
+
+  heart(200, 360, 1.0, c1);
+  heart(322, 358, 1.0, c2);
+  heart(236, 300, 0.9, c3);
+  heart(304, 296, 0.9, c4);
+}
+
+function paint(state) {
+  paintStats(state);
+  paintNames(state);
+  drawPlant(state);
+}
+
+// ----- boot / room handling ----------------------------------
 async function loadRoom() {
-  const room = store.room;
-  if (roomInput) roomInput.value = room;
-
-  // set identity radios
-  const who = store.who;
-  whoRadios.forEach(r => { r.checked = (r.value === who); });
-
-  if (!room) {
-    setStatus("Add ?room=code to the link, or type a code above");
+  if (!ROOM) {
+    setStatus("Add ?room=code to the link");
     return;
   }
+  if (roomInput) roomInput.value = ROOM;
   try {
     setStatus("");
-    const state = await apiGet(room);
+    const state = await apiGet(ROOM);
     paint(state);
   } catch (e) {
-    setStatus("Could not reach the server");
+    setStatus("Could not reach the server. Try again or host on GitHub Pages.");
   }
 }
 
-// identity change
-whoRadios.forEach(radio => {
-  radio.addEventListener("change", () => {
-    if (radio.checked) {
-      store.who = radio.value;
-    }
-  });
-});
-
-// room apply
-roomApply?.addEventListener("click", () => {
-  const v = (roomInput.value || "").trim();
-  if (!v) return;
-  store.room = v;
-  // rewrite the URL so you can share it
-  const url = new URL(location.href);
-  url.searchParams.set("room", v);
-  history.replaceState(null, "", url.toString());
+window.addEventListener("DOMContentLoaded", () => {
+  if (ROOM && roomInput) roomInput.value = ROOM;
   loadRoom();
 });
 
-// save names
-renameBtn?.addEventListener("click", async () => {
-  const room = store.room;
-  if (!room) return setStatus("Add ?room=code to the link");
+// allow changing room via the box
+roomApply?.addEventListener("click", () => {
+  const code = (roomInput?.value || "").trim();
+  if (!code) return;
+  // update URL so you can share the link
+  const u = new URL(location.href);
+  u.searchParams.set("room", code);
+  history.replaceState(null, "", u.toString());
+  ROOM = code;
+  loadRoom();
+});
 
+// ----- actions -----------------------------------------------
+renameBtn?.addEventListener("click", async () => {
+  if (!ROOM) return setStatus("Add ?room=code to the link");
   try {
-    const res = await apiPost(room, {
+    const res = await apiPost(ROOM, {
       op: "rename",
       me: meInput.value.trim() || "Me",
       partner: partnerInput.value.trim() || "Partner",
@@ -134,41 +196,42 @@ renameBtn?.addEventListener("click", async () => {
   }
 });
 
-// water
 waterBtn?.addEventListener("click", async () => {
-  const room = store.room;
-  if (!room) return setStatus("Add ?room=code to the link");
+  if (!ROOM) return setStatus("Add ?room=code to the link");
   try {
-    const res = await apiPost(room, {
+    const res = await apiPost(ROOM, {
       op: "log",
       action: "water",
-      by: store.who,          // important: Me or Partner
-      date: todayUTC(),
+      by: selectedWho(),
+      date: today(),
     });
     paint(res.state);
     setStatus("");
   } catch (e) {
-    setStatus(e.message || "Could not log");
+    if (String(e.message).includes("already logged today")) {
+      setStatus("already logged today by this member");
+    } else {
+      setStatus("Could not log");
+    }
   }
 });
 
-// fight
 fightBtn?.addEventListener("click", async () => {
-  const room = store.room;
-  if (!room) return setStatus("Add ?room=code to the link");
+  if (!ROOM) return setStatus("Add ?room=code to the link");
   try {
-    const res = await apiPost(room, {
+    const res = await apiPost(ROOM, {
       op: "log",
       action: "fight",
-      by: store.who,          // important: Me or Partner
-      date: todayUTC(),
+      by: selectedWho(),
+      date: today(),
     });
     paint(res.state);
     setStatus("");
   } catch (e) {
-    setStatus(e.message || "Could not log");
+    if (String(e.message).includes("already logged today")) {
+      setStatus("already logged today by this member");
+    } else {
+      setStatus("Could not log");
+    }
   }
 });
-
-// boot
-window.addEventListener("DOMContentLoaded", loadRoom);
