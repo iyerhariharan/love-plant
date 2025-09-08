@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Love Plant</title>
+  <meta name="theme-color" content="#fff4e7">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@800;900&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="sky"></div>
+  <div class="sand"></div>
+  <div class="grain"></div>
+
+  <header class="poster">
+    <div class="titleWrap">
+      <h1 class="title">LOVE PLANT</h1>
+      <p class="subtitle">a surreal ritual for two</p>
+    </div>
+    <div class="roomWrap">
+      <label>Room</label>
+      <input id="roomInput" placeholder="enter code" />
+      <button id="roomApply" class="pill">Use</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="panel">
+      <div id="status" class="status"></div>
+      <div class="topBar">
+        <div class="names">
+          <input id="meInput" class="nameInput" value="Me" maxlength="18" aria-label="your name">
+          <span class="amp">&</span>
+          <input id="partnerInput" class="nameInput" value="Partner" maxlength="18" aria-label="partner name">
+          <button id="renameBtn" class="pill">Save names</button>
+        </div>
+        <div class="actions">
+          <button id="waterBtn" class="cta liquid">💧 Water</button>
+          <button id="fightBtn" class="cta jagged">⚡ Fight</button>
+        </div>
+      </div>
+
+      <div class="canvas">
+        <svg id="plantSvg" viewBox="0 0 520 520" class="scene" aria-label="surreal plant"></svg>
+        <div class="floatStats" id="stats">
+          <div class="blobStat"><div class="k">Streak</div><div class="v" id="streakVal">0</div></div>
+          <div class="blobStat"><div class="k">Best</div><div class="v" id="bestVal">0</div></div>
+          <div class="blobStat"><div class="k">Peace</div><div class="v" id="peaceVal">0</div></div>
+          <div class="blobStat"><div class="k">Fights</div><div class="v" id="fightsCount">0</div></div>
+        </div>
+      </div>
+
+      <div class="feed">
+        <ul id="activityList" class="timeline"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script>window.WORKER_BASE = "https://loveplant.hariharanmiyer.workers.dev";</script>
+  <script src="app.js"></script>
+</body>
+</html>
